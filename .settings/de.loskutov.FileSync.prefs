@@ -1,0 +1,8 @@
+WARNING=DO NOT MODIFY THIS FILE IF YOU DON'T UNDERSTAND
+defaultDestination=
+defaultVariables=
+eclipse.preferences.version=1
+includeTeamPrivateFiles=false
+map|0=src/main/webapp|@target/weixin-0.0.1-SNAPSHOT|,|,|,
+map|1=target/classes|@target/weixin-0.0.1-SNAPSHOT/WEB-INF/classes|,|,|,
+useCurrentDateForDestinationFiles=false
