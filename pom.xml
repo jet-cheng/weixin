@@ -168,7 +168,7 @@
                 		<configuration>
                 			<changepass>false</changepass>
                 			<appid>appidm2lzboceb7</appid>
-                			<version>?</version>     			
+                			<version>0</version>     			
                 		</configuration>
                 	</execution>
                 </executions>
