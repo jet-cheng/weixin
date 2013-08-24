@@ -2,17 +2,18 @@ package com.wini.weixin.processor;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import javax.servlet.ServletInputStream;
+import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.b3log.latke.Latkes;
+import org.b3log.latke.logging.Level;
+import org.b3log.latke.logging.Logger;
 import org.b3log.latke.servlet.HTTPRequestContext;
 import org.b3log.latke.servlet.HTTPRequestMethod;
 import org.b3log.latke.servlet.URIPatternMode;
@@ -21,13 +22,21 @@ import org.b3log.latke.servlet.annotation.RequestProcessor;
 import org.b3log.latke.servlet.renderer.freemarker.AbstractFreeMarkerRenderer;
 
 import com.wini.weixin.FrontRenderer;
+import com.wini.weixin.service.ArticleQueryService;
 import com.wini.weixin.util.Sha1Util;
+import com.wini.weixin.util.XmlUtil;
 
 @RequestProcessor
 public class WeixinProcessor {
 
-	public static final Logger LOGGER = Logger.getLogger(WeixinProcessor.class
-			.getName());
+	public static final Logger LOGGER = Logger.getLogger(WeixinProcessor.class.getName());
+
+	@Inject
+	private ArticleQueryService articleQueryService;
+
+	public void setArticleQueryService(ArticleQueryService articleQueryService) {
+		this.articleQueryService = articleQueryService;
+	}
 
 	@RequestProcessing(value = { "/\\d*", "/index" }, uriPatternsMode = URIPatternMode.REGEX, method = HTTPRequestMethod.GET)
 	public void index(final HTTPRequestContext context) throws Exception {
@@ -63,46 +72,70 @@ public class WeixinProcessor {
 			sign = Sha1Util.Encrypt(sign);
 			LOGGER.info("签名密码:" + sign);
 			if (sign.equals(signature)) {
-				LOGGER.info("签名成功");
+				LOGGER.log(Level.INFO, "签名成功");
 				HttpServletResponse response = context.getResponse();
 				response.getWriter().print(echostr);
 				response.getWriter().close();
 			}
 		} catch (Exception e) {
-			renderer.setTemplateName("error.ftl");
-			final Map<String, Object> dataModel = renderer.getDataModel();
-			dataModel.put("error", "公众平台签名出错");
+			LOGGER.log(Level.ERROR, "签名失败", e);
 		}
 	}
 
 	@RequestProcessing(value = { "/weixin" }, method = HTTPRequestMethod.POST)
 	public void post(final HTTPRequestContext context) throws Exception {
-		HttpServletRequest request = context.getRequest();
-		String postStr = readStreamParameter(request.getInputStream());
-		LOGGER.info("POST的信息:[" + postStr + "]");
+		try{
+			HttpServletRequest request = context.getRequest();
+			String postStr = readStreamParameter(request);
+			LOGGER.info("POST的信息:[" + postStr + "]");
+			Map<String, String> map = XmlUtil.xml2Map(postStr);
+			String content = map.get("Content");
+			LOGGER.info("content:" + content);
+			
+		}catch(Exception e){
+			LOGGER.log(Level.ERROR, "请求失败", e);
+		}
+		
+		
 	}
 
-	// 从输入流读取post参数
-	public String readStreamParameter(ServletInputStream in) {
-		StringBuilder buffer = new StringBuilder();
-		BufferedReader reader = null;
+
+	private String readStreamParameter(HttpServletRequest request) {
 		try {
-			reader = new BufferedReader(new InputStreamReader(in));
-			String line = null;
-			while ((line = reader.readLine()) != null) {
-				buffer.append(line);
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		} finally {
-			if (null != reader) {
-				try {
-					reader.close();
-				} catch (IOException e) {
-					e.printStackTrace();
+			InputStream in = request.getInputStream();
+			StringBuilder buffer = new StringBuilder();
+			BufferedReader reader = null;
+			try {
+				reader = new BufferedReader(new InputStreamReader(in,"utf-8"));
+				String line = null;
+				while ((line = reader.readLine()) != null) {
+					buffer.append(line);
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			} finally {
+				if (null != reader) {
+					try {
+						reader.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}
 			}
+			return buffer.toString();
+		} catch (Exception e1) {
+
 		}
-		return buffer.toString();
+		return null;
+	}
+
+	private void print(HttpServletResponse response, String content) {
+		try {
+			response.getWriter().print(content);
+			response.getWriter().flush();
+			response.getWriter().close();
+		} catch (Exception e) {
+
+		}
 	}
 }

@@ -2,9 +2,9 @@ package com.wini.weixin;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
+import org.b3log.latke.logging.Level;
+import org.b3log.latke.logging.Logger;
 import org.b3log.latke.servlet.HTTPRequestContext;
 import org.b3log.latke.servlet.renderer.freemarker.AbstractFreeMarkerRenderer;
 
@@ -23,7 +23,7 @@ public class FrontRenderer extends AbstractFreeMarkerRenderer {
             final String webRootPath = WeixinServletListener.getWebRoot();
             TEMPLATE_CFG.setDirectoryForTemplateLoading(new File(webRootPath));
         } catch (final IOException e) {
-            LOGGER.log(Level.SEVERE,"初始化路径模板路径失败",e);
+            LOGGER.log(Level.ERROR,"初始化路径模板路径失败",e);
         }
 	}
 	
