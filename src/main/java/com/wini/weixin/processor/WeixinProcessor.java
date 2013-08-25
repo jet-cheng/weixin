@@ -1,10 +1,13 @@
-package com.wini.weixin.processor;
+﻿package com.wini.weixin.processor;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.text.MessageFormat;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
 import java.util.Map;
 
 import javax.inject.Inject;
@@ -20,9 +23,15 @@ import org.b3log.latke.servlet.URIPatternMode;
 import org.b3log.latke.servlet.annotation.RequestProcessing;
 import org.b3log.latke.servlet.annotation.RequestProcessor;
 import org.b3log.latke.servlet.renderer.freemarker.AbstractFreeMarkerRenderer;
+import org.json.JSONObject;
 
 import com.wini.weixin.FrontRenderer;
+import com.wini.weixin.model.Article;
+import com.wini.weixin.model.MsgType;
+import com.wini.weixin.model.Weixin;
 import com.wini.weixin.service.ArticleQueryService;
+import com.wini.weixin.util.ImgUtil;
+import com.wini.weixin.util.PropertiesUtil;
 import com.wini.weixin.util.Sha1Util;
 import com.wini.weixin.util.XmlUtil;
 
@@ -84,14 +93,41 @@ public class WeixinProcessor {
 
 	@RequestProcessing(value = { "/weixin" }, method = HTTPRequestMethod.POST)
 	public void post(final HTTPRequestContext context) throws Exception {
+		final AbstractFreeMarkerRenderer renderer = new FrontRenderer();
+		context.setRenderer(renderer);
+		renderer.setTemplateName("index.ftl");
+		final Map<String, Object> dataModel = renderer.getDataModel();
+		dataModel.put("message", "扫描二维码即可关注维尼小弟的博客，获取最新的博客内容");
 		try{
+			int articleCount = 5;
+			List<JSONObject> articles = articleQueryService.getRecentArticles(articleCount);	
+			
 			HttpServletRequest request = context.getRequest();
 			String postStr = readStreamParameter(request);
 			LOGGER.info("POST的信息:[" + postStr + "]");
-			Map<String, String> map = XmlUtil.xml2Map(postStr);
-			String content = map.get("Content");
-			LOGGER.info("content:" + content);
+			Map<String, Object> map = XmlUtil.parseToMap(postStr);
+			String fromUserName = (String)map.get(Weixin.TOUSERNAME);
+			String toUserName = (String)map.get(Weixin.FROMUSERNAME);
+			long createTime = (new Date()).getTime();
+			String msgType = MsgType.NEWS;
 			
+			StringBuffer articlesXml = new StringBuffer();
+			MessageFormat itemFormat = new MessageFormat(PropertiesUtil.get(Weixin.ITEM));
+			for(JSONObject article : articles){
+				String title = article.getString(Article.ARTICLE_TITLE);
+				String description = article.getString(Article.ARTICLE_ABSTRACT);
+				String picUrl = ImgUtil.parseImg(article.getString(Article.ARTICLE_CONTENT));
+				String url = "http://www.winilog.com" + article.getString(Article.ARTICLE_PERMALINK);
+				LOGGER.log(Level.INFO, "title:" + title);
+				LOGGER.log(Level.INFO, "description:" + description);
+				LOGGER.log(Level.INFO, "picUrl:" + picUrl);
+				LOGGER.log(Level.INFO, "url:" + url);
+				articlesXml.append(itemFormat.format(new String[]{title,description,picUrl,url}));
+			}
+			MessageFormat newsFormat = new MessageFormat(PropertiesUtil.get(MsgType.NEWS));
+			String content = newsFormat.format(new Object[]{toUserName,fromUserName,createTime,msgType,articleCount,articlesXml});
+			HttpServletResponse response = context.getResponse();
+			print(response,content);
 		}catch(Exception e){
 			LOGGER.log(Level.ERROR, "请求失败", e);
 		}
@@ -131,11 +167,20 @@ public class WeixinProcessor {
 
 	private void print(HttpServletResponse response, String content) {
 		try {
+			response.setCharacterEncoding("utf-8");
+			LOGGER.info("character:[utf-8]");
 			response.getWriter().print(content);
 			response.getWriter().flush();
 			response.getWriter().close();
 		} catch (Exception e) {
 
 		}
+	}
+	
+	
+	public static void main(String[] args) throws Exception{
+		String s = PropertiesUtil.get(Weixin.ITEM);
+		MessageFormat formate = new MessageFormat(s);
+		System.out.println(formate.format(new String[]{"2","3","1"}));
 	}
 }
